@@ -311,50 +311,71 @@ namespace positron
             {
                 if (ShowMouse)
                 {
+                    string str =
+                        m_MousePos.ToString() + "\n" +
+                        (offset + m_MousePos).ToString() + "\n" +
+                        zoom;
+                    List<SKRect> lineboundsList = new List<SKRect>();
+
+                    float height = 0;
+                    float width = 0;
+
+                    foreach (string line in str.Split("\n"))
+                    {
+                        // Measure the bounds of the text
+                        SKRect lineBounds = new SKRect();
+                        paint.MeasureText(line, ref lineBounds);
+
+                        lineBounds = lineBounds.Standardized;
+                        // Fix the inverted height value from the MeaureText
+
+                        height += lineBounds.Height;
+                        width = width > lineBounds.Width ? width : lineBounds.Width;
+
+                        lineboundsList.Add(lineBounds);
+
+                    }
+
+                    SKPoint pos = m_MousePos;
+
+                    if (pos.X < sideBarWidth + 1)
+                    {
+                        pos.X = sideBarWidth + 1;
+                    }
+                    if (pos.Y - height < 0)
+                    {
+                        pos.Y = height;
+                    }
+                    if (pos.X + width > e.Bounds.Width)
+                    {
+                        pos.X = e.Bounds.Width - width;
+                    }
+                    if (pos.Y > e.Bounds.Height)
+                    {
+                        pos.Y = e.Bounds.Height;
+                    }
+
                     // Configure the Paint to draw a black rectangle behind the text
                     paint.Color = SKColors.Black;
                     paint.Style = SKPaintStyle.Fill;
 
-                    // Measure the bounds of the text
-                    string line1 = m_MousePos.ToString();// +"\n"+ (offset+m_MousePos).ToString();
-                    SKRect line1Bounds = new SKRect();
-                    paint.MeasureText(line1, ref line1Bounds);
+                    e.Canvas.DrawRect(new SKRect(pos.X, pos.Y - height, pos.X + width, pos.Y), paint);
 
-                    // Fix the inverted height value from the MeaureText
-                    line1Bounds = line1Bounds.Standardized;
-
-                    string line2 = ScreenToWorld(m_MousePos).ToString();
-                    SKRect line2Bounds = new SKRect();
-                    paint.MeasureText(line2, ref line2Bounds);
-
-                    // Fix the inverted height value from the MeaureText
-                    line1Bounds = line1Bounds.Standardized;
-
-                    SKPoint pos = m_MousePos;
-
-                    if (pos.X > SkiaSurface.Width - line1Bounds.Width)
-                    {pos.X = SkiaSurface.Width - line1Bounds.Width;}
-                    if (pos.X > SkiaSurface.Width - line2Bounds.Width)
-                    { pos.X = SkiaSurface.Width - line2Bounds.Width; }
-                    if (pos.Y - (line1Bounds.Height + line2Bounds.Height) < 0)
-                    {pos.Y = line1Bounds.Height + line2Bounds.Height; }
-                    if (pos.X < 0)
-                    {pos.X = 0;}
-                    if (pos.Y > SkiaSurface.Height)
-                    {pos.Y = SkiaSurface.Height;}
-                    pos.Y -= line1Bounds.Height + line2Bounds.Height;
-                    //textBounds.Location = new SKPoint(m_MousePos.X, m_MousePos.Y - textBounds.Height);
-                    line1Bounds.Location = pos;
-                    line2Bounds.Location = pos + new SKPoint(0,line1Bounds.Height);
-                    // Draw the black filled rectangle where the text will go
-                    e.Canvas.DrawRect(line1Bounds, paint);
-                    e.Canvas.DrawRect(line2Bounds, paint);
                     // Change the Paint to yellow
                     paint.Color = SKColors.Yellow;
-                    pos.Y += line1Bounds.Height;
-                    // Draw the mouse coordinates text
-                    e.Canvas.DrawText(line1, pos, paint);
-                    e.Canvas.DrawText(line2, pos+new SKPoint(0, line1Bounds.Height), paint);
+                    float linesHeight = 0;
+                    int i = 0;
+                    foreach (string line in str.Split("\n"))
+                    {
+                        linesHeight += lineboundsList[i].Height;
+                        e.Canvas.DrawText(
+                            line,
+                            new SKPoint(pos.X, pos.Y - height + linesHeight),
+                            paint
+                        );
+                        i++;
+                    }
+                    //e.Canvas.DrawText(line2, pos+new SKPoint(0, line1Bounds.Height), paint);
                 }
             }
         }
