@@ -388,10 +388,11 @@ namespace positron
             using SKPaint paint = new();
             if (ShowMouse)
             {
+                int padding = 2;
                 string str =
-                    mousePos.ToString() + "\n" +
-                    (offset + mousePos).ToString() + "\n" +
-                    zoom;
+                    "ScreenPos:"+mousePos.ToString() + "\n" +
+                    "WorldPos:"+ScreenToWorld(mousePos).ToString() + "\n" +
+                    "Zoom:"+(int)(zoom*100)+"%";
                 List<SKRect> lineboundsList = new();
 
                 float height = 0;
@@ -405,6 +406,10 @@ namespace positron
 
                     lineBounds = lineBounds.Standardized;
                     // Fix the inverted height value from the MeaureText
+                    lineBounds.Top -= padding;
+                    lineBounds.Left -= padding;
+                    lineBounds.Right += padding;
+                    lineBounds.Bottom += padding;
 
                     height += lineBounds.Height;
                     width = width > lineBounds.Width ? width : lineBounds.Width;
@@ -447,7 +452,7 @@ namespace positron
                     linesHeight += lineboundsList[i].Height;
                     e.Canvas.DrawText(
                         line,
-                        new(pos.X, pos.Y - height + linesHeight),
+                        new(pos.X + padding, pos.Y - height + linesHeight - padding),
                         paint
                     );
                     i++;
