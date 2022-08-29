@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Threading;
 using System.Windows.Forms;
+using System.Windows.Input;
 using SkiaSharp;
 using SkiaSharp.Views.Desktop;
 using PGL;
@@ -25,13 +26,16 @@ namespace positron
         private bool ShowMouse = false;
         private Point m_PrevMouseLoc = new Point();
         public List<EComponent> Components = new List<EComponent>();
-        private SKPoint offset = new SKPoint();
-        private float zoom = 1;
         private int sideBarWidth=100;
+        private SKPoint offset;
+        private float zoom = 1;
+        private MouseState mouseState = MouseState.None;
+        private List<Node> nodes = new List<Node>();
 
         public Form1()
         {
             InitializeComponent();
+            offset = new SKPoint(sideBarWidth + 1, 0);
         }
 
         protected override void OnLoad(EventArgs e)
@@ -59,6 +63,7 @@ namespace positron
 
             // Subscribe to the SKGLControl events
             SkiaSurface.MouseMove += SkglControl1_MouseMove;
+            SkiaSurface.MouseDown += SkiaSurface_MouseDown;
             SkiaSurface.KeyDown += SkiaSurface_KeyDown;
             SkiaSurface.MouseWheel += SkiaSurface_MouseWheel;
 
@@ -74,6 +79,85 @@ namespace positron
 
         }
 
+        private void SkiaSurface_MouseDown(object? sender, MouseEventArgs e)
+        {
+            Position mousePos = MousePos(e.Location.ToSKPoint());
+            switch (mousePos.Section)
+            {
+                case Section.None:
+                    break;
+                case Section.Sidebar:
+                    break;
+                case Section.SidebarSizer:
+                    break;
+                case Section.Main:
+                    if (
+                        e.Button == MouseButtons.Middle ||
+                        (
+                            e.Button == MouseButtons.Left &&
+                            ModifierKeys == Keys.Alt
+                        )
+                    )
+                    {
+                        mouseState = MouseState.Panning;
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+        private Position MousePos(SKPoint mouse)
+        {
+            if (mouse.X > sideBarWidth - 1 && mouse.X < sideBarWidth + 2)
+            {
+                return new Position
+                {
+                    Section = Section.SidebarSizer,
+                    Node = null
+                };
+            }
+            if (mouse.X < sideBarWidth)
+            {
+                return new Position
+                {
+                    Section = Section.Sidebar,
+                    Node = null
+                };
+            }
+            if (mouse.X > sideBarWidth)
+            {
+                foreach (Node n in nodes)
+                {
+                    SKPoint pos = WorldToScreen(n.Position);
+                    if (
+                        new SKRect(
+                            pos.X - 2,
+                            pos.Y - 2,
+                            pos.X + 2,
+                            pos.Y + 2
+                        )
+                        .Contains(mouse)
+                    )
+                    {
+                        return new Position
+                        {
+                            Section = Section.Main,
+                            Node = n
+                        };
+                    }
+                }
+                return new Position
+                {
+                    Section = Section.Main,
+                    Node = null
+                };
+            }
+            return new Position
+            {
+                Section = Section.None,
+                Node = null
+            };
+        }
         private void Layer_NCDisplay_Draw(object? sender, EventArgs_Draw e)
         {
             using (SKPaint paint = new SKPaint())
@@ -118,7 +202,7 @@ namespace positron
             }
             if (e.KeyCode == Keys.F3)
             {
-                offset.X = 0;
+                offset.X = sideBarWidth+1;
                 offset.Y = 0;
                 zoom = 1;
                 layer_Grid.Invalidate();
@@ -133,10 +217,15 @@ namespace positron
             // Save the mouse position
             m_MousePos = e.Location.ToSKPoint();
 
+            if (e.Button == MouseButtons.None)
+            {
+                mouseState = MouseState.None;
+            }
+
             // If Mouse Move, draw new mouse coordinates
             if (e.Location != m_PrevMouseLoc)
             {
-                if (e.Button == MouseButtons.Middle)
+                if (mouseState == MouseState.Panning)
                 {
                     offset.X += e.Location.X - m_PrevMouseLoc.X;
                     offset.Y += e.Location.Y - m_PrevMouseLoc.Y;
@@ -291,6 +380,18 @@ namespace positron
             None,
             Panning,
             ResizeSidebar,
+        }
+        private enum Section
+        {
+            None,
+            Sidebar,
+            SidebarSizer,
+            Main,
+        }
+        private struct Position
+        {
+            public Section Section;
+            public Node? Node;
         }
     }
 }
