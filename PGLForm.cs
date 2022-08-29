@@ -125,7 +125,7 @@ namespace PGL
             // Start a new rendering cycle to redraw all of the layers.
             UpdateDrawing();
         }
-        public void UpdateDrawing()
+        public virtual void UpdateDrawing()
         {
             // Unblock the rendering thread to begin a render cycle.  Only the invalidated
             // Layers will be re-rendered, but all will be repainted onto the SKGLControl.

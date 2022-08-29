@@ -1,3 +1,4 @@
+#pragma warning disable IDE0044 // Add readonly modifier
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -21,31 +22,35 @@ namespace positron
         private Layer layer_Data;
         private Layer layer_Overlay;
         private Layer layer_NCDisplay;
-        private SKPoint m_MousePos = new SKPoint();
+        private SKPoint mousePos = new();
         private bool ShowGrid = true;
         private bool ShowMouse = false;
-        private Point m_PrevMouseLoc = new Point();
-        public List<EComponent> Components = new List<EComponent>();
+        private Point m_PrevMouseLoc = new();
+        public List<EComponent> Components = new();
         private int sideBarWidth=100;
         private SKPoint offset;
         private float zoom = 1;
         private MouseState mouseState = MouseState.None;
-        private List<Node> nodes = new List<Node>();
+        private List<Node> nodes = new();
+        private int resizingOffset = 0;
 
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
         public Form1()
+#pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
+        //disabled cause they are initialised in the onload method
         {
             InitializeComponent();
-            offset = new SKPoint(sideBarWidth + 1, 0);
+            offset = new(sideBarWidth + 1, 0);
         }
 
         protected override void OnLoad(EventArgs e)
         {
             // Create layers to draw on, each with a dedicated SKPicture
-            layer_Background = new Layer("Background Layer");
-            layer_Grid = new Layer("Grid Layer");
-            layer_Data = new Layer("Data Layer");
-            layer_Overlay = new Layer("Overlay Layer");
-            layer_NCDisplay = new Layer("Non Content Layer");
+            layer_Background = new("Background Layer");
+            layer_Grid = new("Grid Layer");
+            layer_Data = new("Data Layer");
+            layer_Overlay = new("Overlay Layer");
+            layer_NCDisplay = new("Non Content Layer");
 
             // Add the drawing layers to there collection
             Layers.Add(layer_Background);
@@ -66,6 +71,7 @@ namespace positron
             SkiaSurface.MouseDown += SkiaSurface_MouseDown;
             SkiaSurface.KeyDown += SkiaSurface_KeyDown;
             SkiaSurface.MouseWheel += SkiaSurface_MouseWheel;
+            SkiaSurface.Resize += SkiaSurface_Resize;
 
             base.OnLoad(e);
 
@@ -74,11 +80,29 @@ namespace positron
 
 
             Components.Add(new ECWire());
-            Components[0].IONodes[0] = new Node(new SKPoint(50, 50));
-            Components[0].IONodes[1] = new Node(new SKPoint(150, 150));
+            Components[0].IONodes[0] = new(new SKPoint(50, 50));
+            Components[0].IONodes[1] = new(new SKPoint(150, 150));
 
         }
 
+        private void SkiaSurface_Resize(object? sender, EventArgs e)
+        {
+            if (sideBarWidth < 50)
+            {
+                sideBarWidth = 50;
+            }
+            if (sideBarWidth > SkiaSurface.Width - 50)
+            {
+                sideBarWidth = SkiaSurface.Width - 50;
+            }
+            layer_NCDisplay.Invalidate();
+        }
+
+        public override void UpdateDrawing()
+        {
+            SetCursor();
+            base.UpdateDrawing();
+        }
         private void SkiaSurface_MouseDown(object? sender, MouseEventArgs e)
         {
             Position mousePos = MousePos(e.Location.ToSKPoint());
@@ -89,6 +113,11 @@ namespace positron
                 case Section.Sidebar:
                     break;
                 case Section.SidebarSizer:
+                    if (e.Button == MouseButtons.Left)
+                    {
+                        mouseState = MouseState.ResizeSidebar;
+                        resizingOffset = sideBarWidth - e.X;
+                    }
                     break;
                 case Section.Main:
                     if (
@@ -105,6 +134,7 @@ namespace positron
                 default:
                     break;
             }
+            SetCursor();
         }
         private Position MousePos(SKPoint mouse)
         {
@@ -160,12 +190,10 @@ namespace positron
         }
         private void Layer_NCDisplay_Draw(object? sender, EventArgs_Draw e)
         {
-            using (SKPaint paint = new SKPaint())
-            {
-                e.Canvas.DrawLine(new SKPoint(sideBarWidth + 1, 0), new SKPoint(100, e.Bounds.Height), paint);
-                paint.Color = SKColors.White;
-                e.Canvas.DrawRect(new SKRect(0, 0, sideBarWidth, e.Bounds.Height), paint);
-            }
+            using SKPaint paint = new();
+            e.Canvas.DrawLine(new(sideBarWidth + 1, 0), new(sideBarWidth + 1, e.Bounds.Height), paint);
+            paint.Color = SKColors.White;
+            e.Canvas.DrawRect(new(0, 0, sideBarWidth, e.Bounds.Height), paint);
         }
 
         private void SkiaSurface_MouseWheel(object? sender, MouseEventArgs e)
@@ -184,7 +212,6 @@ namespace positron
             layer_Data.Invalidate();
             layer_Grid.Invalidate();
             layer_Overlay.Invalidate();
-            Console.WriteLine(zoom);
             UpdateDrawing();
         }
 
@@ -215,8 +242,8 @@ namespace positron
         private void SkglControl1_MouseMove(object? sender, MouseEventArgs e)
         {
             // Save the mouse position
-            m_MousePos = e.Location.ToSKPoint();
-
+            mousePos = e.Location.ToSKPoint();
+            SetCursor();
             if (e.Button == MouseButtons.None)
             {
                 mouseState = MouseState.None;
@@ -225,12 +252,34 @@ namespace positron
             // If Mouse Move, draw new mouse coordinates
             if (e.Location != m_PrevMouseLoc)
             {
+                switch (mouseState)
+                {
+                    case MouseState.None:
+                        break;
+                    case MouseState.Panning:{
+                        offset.X += e.Location.X - m_PrevMouseLoc.X;
+                        offset.Y += e.Location.Y - m_PrevMouseLoc.Y;
+                        layer_Data.Invalidate();
+                        layer_Grid.Invalidate();
+                    } break;
+                    case MouseState.ResizeSidebar:{
+                        sideBarWidth = e.X - resizingOffset;
+                        if (sideBarWidth < 50)
+                        {
+                            sideBarWidth = 50;
+                        }
+                        if (sideBarWidth > SkiaSurface.Width - 50)
+                        {
+                            sideBarWidth = SkiaSurface.Width - 50;
+                        }
+                        layer_NCDisplay.Invalidate();
+                    }break;
+                    default:
+                        break;
+                }
                 if (mouseState == MouseState.Panning)
                 {
-                    offset.X += e.Location.X - m_PrevMouseLoc.X;
-                    offset.Y += e.Location.Y - m_PrevMouseLoc.Y;
-                    layer_Data.Invalidate();
-                    layer_Grid.Invalidate();
+
                 }
                 // Remember the previous mouse location
                 m_PrevMouseLoc = e.Location;
@@ -241,59 +290,88 @@ namespace positron
             // Start a new rendering cycle to redraw any invalidated layers.
             UpdateDrawing();
         }
+        private void SetCursor()
+        {
+            Position pos = MousePos(mousePos);
+            Cursor nCursor = Cursor.Current;
+            switch (pos.Section)
+            {
+                case Section.SidebarSizer:
+                    nCursor = Cursors.SizeWE;
+                    break;
+                case Section.Main:
+                    nCursor = Cursors.Cross;
+                    break;
+                case Section.None:
+                case Section.Sidebar:
+                default:
+                    nCursor = Cursors.Default;
+                    break;
+            }
+            //make sure the cursor is correct when elements might not have updated yet
+            switch (mouseState)
+            {
+                case MouseState.Panning:
+                    nCursor = Cursors.NoMove2D;
+                    break;
+                case MouseState.ResizeSidebar:
+                    nCursor = Cursors.VSplit;
+                    break;
+                case MouseState.None:
+                default:
+                    break;
+            }
+            Cursor = nCursor;
+        }
         private void Layer_Background_Draw(object? sender, EventArgs_Draw e)
         {
             // Create a diagonal gradient fill from Blue to Black to use as the background
-            SKPoint topLeft = new SKPoint(e.Bounds.Left, e.Bounds.Top);
-            SKPoint bottomRight = new SKPoint(e.Bounds.Right, e.Bounds.Bottom);
-            SKColor[] gradColors = new SKColor[] { SKColors.LightBlue, SKColors.Lavender};
+            SKPoint topLeft = new(e.Bounds.Left, e.Bounds.Top);
+            SKPoint bottomRight = new(e.Bounds.Right, e.Bounds.Bottom);
+            SKColor[] gradColors = new[] { SKColors.LightBlue, SKColors.Lavender};
 
-            using (SKPaint paint = new SKPaint())
-            using (SKShader shader = SKShader.CreateLinearGradient(topLeft, bottomRight, gradColors, SKShaderTileMode.Clamp))
-            {
-                paint.Shader = shader;
-                paint.Style = SKPaintStyle.Fill;
-                e.Canvas.DrawRect(e.Bounds, paint);
-            }
+            using SKPaint paint = new();
+            using SKShader shader = SKShader.CreateLinearGradient(topLeft, bottomRight, gradColors, SKShaderTileMode.Clamp);
+            paint.Shader = shader;
+            paint.Style = SKPaintStyle.Fill;
+            e.Canvas.DrawRect(e.Bounds, paint);
         }
         private void Layer_Grid_Draw(object? sender, EventArgs_Draw e)
         {
-            using (SKPaint paint = new SKPaint())
+            using SKPaint paint = new();
+            // Draw a 25x25 grid of gray lines
+
+            paint.Color = SKColors.Gray; // Very dark gray
+            paint.Style = SKPaintStyle.Stroke;
+            paint.StrokeWidth = 1;
+
+            if (ShowGrid)
             {
-                // Draw a 25x25 grid of gray lines
-
-                paint.Color = SKColors.Gray; // Very dark gray
-                paint.Style = SKPaintStyle.Stroke;
-                paint.StrokeWidth = 1;
-
-                if (ShowGrid)
+                // Draw the Horizontal Grid Lines
+                int i = ((int)offset.Y % (int)(30 * zoom));
+                while (i < e.Bounds.Height)
                 {
-                    // Draw the Horizontal Grid Lines
-                    int i = ((int)offset.Y % (int)(30*zoom));
-                    while (i < e.Bounds.Height)
-                    {
-                        SKPoint leftPoint = new SKPoint(e.Bounds.Left, i);
-                        SKPoint rightPoint = new SKPoint(e.Bounds.Right, i);
+                    SKPoint leftPoint = new(e.Bounds.Left, i);
+                    SKPoint rightPoint = new(e.Bounds.Right, i);
 
-                        e.Canvas.DrawLine(leftPoint, rightPoint, paint);
+                    e.Canvas.DrawLine(leftPoint, rightPoint, paint);
 
-                        i += (int)(30 * zoom);
-                    }
-
-                    // Draw the Vertical Grid Lines
-                    i = ((int)offset.X % (int)(30 * zoom));
-                    while (i < e.Bounds.Width)
-                    {
-                        SKPoint topPoint = new SKPoint(i, e.Bounds.Top);
-                        SKPoint bottomPoint = new SKPoint(i, e.Bounds.Bottom);
-
-                        e.Canvas.DrawLine(topPoint, bottomPoint, paint);
-
-                        i += (int)(30 * zoom);
-                    }
+                    i += (int)(30 * zoom);
                 }
-                e.Canvas.DrawCircle(offset, 5, paint);
+
+                // Draw the Vertical Grid Lines
+                i = ((int)offset.X % (int)(30 * zoom));
+                while (i < e.Bounds.Width)
+                {
+                    SKPoint topPoint = new(i, e.Bounds.Top);
+                    SKPoint bottomPoint = new(i, e.Bounds.Bottom);
+
+                    e.Canvas.DrawLine(topPoint, bottomPoint, paint);
+
+                    i += (int)(30 * zoom);
+                }
             }
+            e.Canvas.DrawCircle(offset, 5, paint);
         }
         private void Layer_Data_Draw(object? sender, EventArgs_Draw e)
         {
@@ -307,76 +385,74 @@ namespace positron
         {
             // Draw the mouse coordinate text next to the cursor
 
-            using (SKPaint paint = new SKPaint())
+            using SKPaint paint = new();
+            if (ShowMouse)
             {
-                if (ShowMouse)
+                string str =
+                    mousePos.ToString() + "\n" +
+                    (offset + mousePos).ToString() + "\n" +
+                    zoom;
+                List<SKRect> lineboundsList = new();
+
+                float height = 0;
+                float width = 0;
+
+                foreach (string line in str.Split("\n"))
                 {
-                    string str =
-                        m_MousePos.ToString() + "\n" +
-                        (offset + m_MousePos).ToString() + "\n" +
-                        zoom;
-                    List<SKRect> lineboundsList = new List<SKRect>();
+                    // Measure the bounds of the text
+                    SKRect lineBounds = new();
+                    paint.MeasureText(line, ref lineBounds);
 
-                    float height = 0;
-                    float width = 0;
+                    lineBounds = lineBounds.Standardized;
+                    // Fix the inverted height value from the MeaureText
 
-                    foreach (string line in str.Split("\n"))
-                    {
-                        // Measure the bounds of the text
-                        SKRect lineBounds = new SKRect();
-                        paint.MeasureText(line, ref lineBounds);
+                    height += lineBounds.Height;
+                    width = width > lineBounds.Width ? width : lineBounds.Width;
 
-                        lineBounds = lineBounds.Standardized;
-                        // Fix the inverted height value from the MeaureText
+                    lineboundsList.Add(lineBounds);
 
-                        height += lineBounds.Height;
-                        width = width > lineBounds.Width ? width : lineBounds.Width;
-
-                        lineboundsList.Add(lineBounds);
-
-                    }
-
-                    SKPoint pos = m_MousePos;
-
-                    if (pos.X < sideBarWidth + 1)
-                    {
-                        pos.X = sideBarWidth + 1;
-                    }
-                    if (pos.Y - height < 0)
-                    {
-                        pos.Y = height;
-                    }
-                    if (pos.X + width > e.Bounds.Width)
-                    {
-                        pos.X = e.Bounds.Width - width;
-                    }
-                    if (pos.Y > e.Bounds.Height)
-                    {
-                        pos.Y = e.Bounds.Height;
-                    }
-
-                    // Configure the Paint to draw a black rectangle behind the text
-                    paint.Color = SKColors.Black;
-                    paint.Style = SKPaintStyle.Fill;
-
-                    e.Canvas.DrawRect(new SKRect(pos.X, pos.Y - height, pos.X + width, pos.Y), paint);
-
-                    // Change the Paint to yellow
-                    paint.Color = SKColors.Yellow;
-                    float linesHeight = 0;
-                    int i = 0;
-                    foreach (string line in str.Split("\n"))
-                    {
-                        linesHeight += lineboundsList[i].Height;
-                        e.Canvas.DrawText(
-                            line,
-                            new SKPoint(pos.X, pos.Y - height + linesHeight),
-                            paint
-                        );
-                        i++;
-                    }
-                    //e.Canvas.DrawText(line2, pos+new SKPoint(0, line1Bounds.Height), paint);
                 }
+
+                SKPoint pos = mousePos;
+
+                if (pos.X < sideBarWidth + 1)
+                {
+                    pos.X = sideBarWidth + 1;
+                }
+                if (pos.Y - height < 0)
+                {
+                    pos.Y = height;
+                }
+                if (pos.X + width > e.Bounds.Width)
+                {
+                    pos.X = e.Bounds.Width - width;
+                }
+                if (pos.Y > e.Bounds.Height)
+                {
+                    pos.Y = e.Bounds.Height;
+                }
+
+                // Configure the Paint to draw a black rectangle behind the text
+                paint.Color = SKColors.Black;
+                paint.Style = SKPaintStyle.Fill;
+
+                e.Canvas.DrawRect(new(pos.X, pos.Y - height, pos.X + width, pos.Y), paint);
+
+                // Change the Paint to yellow
+                paint.Color = SKColors.Yellow;
+                float linesHeight = 0;
+                int i = 0;
+                foreach (string line in str.Split("\n"))
+                {
+                    linesHeight += lineboundsList[i].Height;
+                    e.Canvas.DrawText(
+                        line,
+                        new(pos.X, pos.Y - height + linesHeight),
+                        paint
+                    );
+                    i++;
+                }
+                //e.Canvas.DrawText(line2, pos+new SKPoint(0, line1Bounds.Height), paint);
             }
         }
         public float ScreenToWorld(float s) => ScreenToWorld(new SKPoint(s, 0)).X;

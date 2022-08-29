@@ -14,7 +14,8 @@ namespace positron
 
         public override void Render(object sender, EventArgs_Draw e)
         {
-            using (SKPaint paint = new SKPaint {
+            using (SKPaint paint = new()
+            {
                 Color = SKColors.Black,
                 StrokeWidth = 5,
                 Style = SKPaintStyle.Stroke,
