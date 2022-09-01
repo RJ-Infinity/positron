@@ -22,17 +22,31 @@ namespace positron
         private Layer layer_Data;
         private Layer layer_Overlay;
         private Layer layer_NCDisplay;
+        
         private SKPoint mousePos = new();
+        private MouseState mouseState = MouseState.None;
+        private Point m_PrevMouseLoc = new();
+        
         private bool ShowGrid = true;
         private bool ShowMouse = false;
-        private Point m_PrevMouseLoc = new();
-        public List<EComponent> Components = new();
-        private int sideBarWidth=100;
+
+        public List<EComponent> ComponentsList = new();
+        private List<Node> nodes = new();
+        
         private SKPoint offset;
         private float zoom = 1;
-        private MouseState mouseState = MouseState.None;
-        private List<Node> nodes = new();
+
+        private int sideBarWidth=100;
         private int resizingOffset = 0;
+        private int scrollOffset = 0;
+        private int scrollbarOffset = 0;
+        private int scrollbarHeight = 0;
+        private int textHeight = 20;
+        private int textPadding = 2;
+        private int scrollBarWidth = 15;
+
+        private Components hoverComponent = Components.None;
+        private Components selectComponent = Components.None;
 
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
         public Form1()
@@ -73,16 +87,17 @@ namespace positron
             SkiaSurface.MouseWheel += SkiaSurface_MouseWheel;
             SkiaSurface.Resize += SkiaSurface_Resize;
 
+            CalculateScrollbar();
+
             base.OnLoad(e);
 
             // Set the title of the Form
             this.Text = "Positron";
 
 
-            Components.Add(new ECWire());
-            Components[0].IONodes[0] = new(new SKPoint(50, 50));
-            Components[0].IONodes[1] = new(new SKPoint(150, 150));
-
+            ComponentsList.Add(new ECWire());
+            ComponentsList[0].IONodes[0] = new(new SKPoint(50, 50));
+            ComponentsList[0].IONodes[1] = new(new SKPoint(150, 150));
         }
 
         private void SkiaSurface_Resize(object? sender, EventArgs e)
@@ -95,6 +110,7 @@ namespace positron
             {
                 sideBarWidth = SkiaSurface.Width - 50;
             }
+            UpdateScroll();
             layer_NCDisplay.Invalidate();
         }
 
@@ -106,19 +122,36 @@ namespace positron
         private void SkiaSurface_MouseDown(object? sender, MouseEventArgs e)
         {
             Position mousePos = MousePos(e.Location.ToSKPoint());
+            Console.WriteLine(mousePos.Section);
             switch (mousePos.Section)
             {
                 case Section.None:
                     break;
                 case Section.Sidebar:
+                    if (e.Button == MouseButtons.Left)
+                    {
+                        selectComponent = mousePos.Component;
+                        layer_NCDisplay.Invalidate();
+                    }
                     break;
-                case Section.SidebarSizer:
+                case Section.SidebarSizer:{
                     if (e.Button == MouseButtons.Left)
                     {
                         mouseState = MouseState.ResizeSidebar;
                         resizingOffset = sideBarWidth - e.X;
                     }
-                    break;
+                } break;
+                case Section.ScrollBarUp:{
+                    scrollOffset -= 15;
+                    UpdateScroll();
+                }break;
+                case Section.ScrollBarDown:{
+                    scrollOffset += 15;
+                    UpdateScroll();
+                }break;
+                case Section.ScrollBarThumb:{
+                    mouseState = MouseState.MovingScrollThumb;
+                }break;
                 case Section.Main:
                     if (
                         e.Button == MouseButtons.Middle ||
@@ -134,7 +167,7 @@ namespace positron
                 default:
                     break;
             }
-            SetCursor();
+            UpdateDrawing();
         }
         private Position MousePos(SKPoint mouse)
         {
@@ -143,15 +176,57 @@ namespace positron
                 return new Position
                 {
                     Section = Section.SidebarSizer,
-                    Node = null
+                    Node = null,
+                    Component = Components.None,
                 };
             }
             if (mouse.X < sideBarWidth)
             {
+                if (mouse.X > sideBarWidth - scrollBarWidth)
+                {
+                    if (mouse.Y < scrollBarWidth)
+                    {
+                        return new Position
+                        {
+                            Section = Section.ScrollBarUp,
+                            Node = null,
+                            Component = Components.None,
+                        };
+                    }
+                    if (mouse.Y > SkiaSurface.Height - scrollBarWidth)
+                    {
+                        return new Position
+                        {
+                            Section = Section.ScrollBarDown,
+                            Node = null,
+                            Component = Components.None,
+                        };
+                    }
+                    if (
+                        mouse.Y > scrollBarWidth + scrollbarOffset &&
+                        mouse.Y < scrollBarWidth + scrollbarOffset + scrollbarHeight
+                    )
+                    {
+                        return new Position
+                        {
+                            Section = Section.ScrollBarThumb,
+                            Node = null,
+                            Component = Components.None,
+                        };
+                    }
+                        return new Position
+                    {
+                        Section = Section.ScrollBar,
+                        Node = null,
+                        Component = Components.None,
+                    };
+                }
+                Components c = (Components)(((mouse.Y + scrollOffset) / textHeight) + 1);
                 return new Position
                 {
                     Section = Section.Sidebar,
-                    Node = null
+                    Node = null,
+                    Component = Enum.IsDefined(typeof(Components), c)?c:Components.None,
                 };
             }
             if (mouse.X > sideBarWidth)
@@ -172,49 +247,147 @@ namespace positron
                         return new Position
                         {
                             Section = Section.Main,
-                            Node = n
+                            Node = n,
+                            Component = Components.None,
                         };
                     }
                 }
                 return new Position
                 {
                     Section = Section.Main,
-                    Node = null
+                    Node = null,
+                    Component = Components.None,
                 };
             }
             return new Position
             {
                 Section = Section.None,
-                Node = null
+                Node = null,
+                Component = Components.None,
             };
         }
         private void Layer_NCDisplay_Draw(object? sender, EventArgs_Draw e)
         {
             using SKPaint paint = new();
+            //resiser
             e.Canvas.DrawLine(new(sideBarWidth + 1, 0), new(sideBarWidth + 1, e.Bounds.Height), paint);
+            //background
             paint.Color = SKColors.White;
-            e.Canvas.DrawRect(new(0, 0, sideBarWidth, e.Bounds.Height), paint);
+            e.Canvas.DrawRect(new(0, 0, sideBarWidth - scrollBarWidth, e.Bounds.Height), paint);
+            //scrollbar
+            paint.Color = SKColors.LightGray;
+            //scrollbar bg
+            e.Canvas.DrawRect(new(
+                sideBarWidth - scrollBarWidth,
+                0,
+                sideBarWidth,
+                e.Bounds.Height
+            ), paint);
+            //scrollbar arrow up
+            paint.Color = SKColors.Black;
+            e.Canvas.DrawLine(
+                new(sideBarWidth - scrollBarWidth + 1, scrollBarWidth - 1),
+                new(sideBarWidth - scrollBarWidth + (float)(scrollBarWidth / 2), 1),
+                paint
+            );
+            e.Canvas.DrawLine(
+                new(sideBarWidth - scrollBarWidth + (float)(scrollBarWidth / 2), 1),
+                new(sideBarWidth - 1, scrollBarWidth - 1),
+                paint
+            );
+            //scrollbar arrow down
+            paint.Color = SKColors.Black;
+            e.Canvas.DrawLine(
+                new(sideBarWidth - scrollBarWidth + 1, e.Bounds.Height - scrollBarWidth + 1),
+                new(sideBarWidth - scrollBarWidth + (float)(scrollBarWidth / 2), e.Bounds.Height - 1),
+                paint
+            );
+            e.Canvas.DrawLine(
+                new(sideBarWidth - scrollBarWidth + (float)(scrollBarWidth / 2), e.Bounds.Height + 1),
+                new(sideBarWidth - 1, e.Bounds.Height - scrollBarWidth + 1),
+                paint
+            );
+            //thumb
+            e.Canvas.DrawRect(new(
+                sideBarWidth - scrollBarWidth,
+                scrollBarWidth + scrollbarOffset,
+                sideBarWidth,
+                scrollBarWidth + scrollbarOffset + scrollbarHeight
+            ), paint);
+            //Components
+            paint.TextSize = textHeight - (textPadding * 2);
+            paint.Color = SKColors.DarkGray;
+
+            int i = 1;
+            foreach (Components component in Enum.GetValues(typeof(Components)))
+            {
+                if (component == Components.None)
+                {
+                    continue;
+                }
+                if (component == hoverComponent)
+                {
+                    paint.Color = SKColors.DarkGray;
+                    e.Canvas.DrawRect(new SKRect(
+                        0,
+                        ((i - 1) * textHeight) - scrollOffset,
+                        sideBarWidth - scrollBarWidth,
+                        (i * textHeight) - scrollOffset
+                    ), paint);
+                }
+                if (component == selectComponent)
+                {
+                    paint.Color = SKColors.Black;
+                    e.Canvas.DrawRect(new SKRect(
+                        0,
+                        ((i - 1) * textHeight) - scrollOffset,
+                        sideBarWidth - scrollBarWidth,
+                        (i * textHeight) - scrollOffset
+                    ), paint);
+                    paint.Color = SKColors.LightBlue;
+                }
+                else
+                {
+                    paint.Color = SKColors.Black;
+                }
+                e.Canvas.DrawText(component.ToString(), textPadding, (i * textHeight) - textPadding - scrollOffset, paint);
+                i++;
+            }
         }
 
         private void SkiaSurface_MouseWheel(object? sender, MouseEventArgs e)
         {
-            SKPoint InitialWorldPos = ScreenToWorld(e.Location.ToSKPoint());
-            zoom *= 1 + (float)((e.Delta / SystemInformation.MouseWheelScrollDelta)*0.1);
-            if (zoom > 15)
+            Position pos = MousePos(e.Location.ToSKPoint());
+            switch (pos.Section)
             {
-                zoom = 15;
+                case Section.Main:{
+                    SKPoint InitialWorldPos = ScreenToWorld(e.Location.ToSKPoint());
+                    zoom *= 1 + (float)((e.Delta / SystemInformation.MouseWheelScrollDelta)*0.1);
+                    if (zoom > 15)
+                    {
+                        zoom = 15;
+                    }
+                    if (zoom < 0.15)
+                    {
+                        zoom = 0.15F;
+                    }
+                    offset += e.Location.ToSKPoint() - WorldToScreen(InitialWorldPos);
+                    layer_Data.Invalidate();
+                    layer_Grid.Invalidate();
+                    layer_Overlay.Invalidate();
+                }break;
+                case Section.Sidebar:{
+                    scrollOffset -= e.Delta/20;
+                    UpdateScroll();
+                }break;
+                case Section.None:
+                case Section.SidebarSizer:
+                default:
+                    break;
             }
-            if (zoom < 0.15)
-            {
-                zoom = 0.15F;
-            }
-            offset += e.Location.ToSKPoint() - WorldToScreen(InitialWorldPos);
-            layer_Data.Invalidate();
-            layer_Grid.Invalidate();
-            layer_Overlay.Invalidate();
+
             UpdateDrawing();
         }
-
         private void SkiaSurface_KeyDown(object? sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.F1)
@@ -238,7 +411,19 @@ namespace positron
             }
             UpdateDrawing();
         }
-
+        private void UpdateScroll()
+        {
+            if (scrollOffset > ((Enum.GetNames(typeof(Components)).Length - 1) * textHeight) - SkiaSurface.Height)
+            {
+                scrollOffset = ((Enum.GetNames(typeof(Components)).Length - 1) * textHeight) - SkiaSurface.Height;
+            }
+            if (scrollOffset < 0)
+            {
+                scrollOffset = 0;
+            }
+            CalculateScrollbar();
+            layer_NCDisplay.Invalidate();
+        }
         private void SkglControl1_MouseMove(object? sender, MouseEventArgs e)
         {
             // Save the mouse position
@@ -247,6 +432,28 @@ namespace positron
             if (e.Button == MouseButtons.None)
             {
                 mouseState = MouseState.None;
+            }
+            Position mp = MousePos(mousePos);
+            if (mp.Section != Section.Sidebar && hoverComponent != Components.None)
+            {
+                hoverComponent = Components.None;
+                layer_NCDisplay.Invalidate();
+            }
+
+            switch (mp.Section)
+            {
+                case Section.Sidebar:
+                    if (hoverComponent != mp.Component)
+                    {
+                        hoverComponent = mp.Component;
+                        layer_NCDisplay.Invalidate();
+                    }
+                    break;
+                case Section.None:
+                case Section.SidebarSizer:
+                case Section.Main:
+                default:
+                    break;
             }
 
             // If Mouse Move, draw new mouse coordinates
@@ -276,10 +483,6 @@ namespace positron
                     }break;
                     default:
                         break;
-                }
-                if (mouseState == MouseState.Panning)
-                {
-
                 }
                 // Remember the previous mouse location
                 m_PrevMouseLoc = e.Location;
@@ -322,6 +525,24 @@ namespace positron
                     break;
             }
             Cursor = nCursor;
+        }
+        private void CalculateScrollbar()
+        {
+            int contentHeight = (Enum.GetNames(typeof(Components)).Length - 1) * textHeight;
+            if (SkiaSurface.Height >= contentHeight)
+            {
+                scrollbarOffset = 0;
+                scrollbarHeight = SkiaSurface.Height - (scrollBarWidth * 2);
+            }
+            else
+            {
+                scrollbarHeight = (int)((SkiaSurface.Height / (float)contentHeight) * (SkiaSurface.Height - (scrollBarWidth * 2)));
+                scrollbarHeight = Math.Max(
+                    Math.Min(20, SkiaSurface.Height - (scrollBarWidth * 2)),
+                    scrollbarHeight
+                );
+                scrollbarOffset = (int)(scrollOffset / (float)(contentHeight - SkiaSurface.Height) * (SkiaSurface.Height - (scrollBarWidth * 2) - scrollbarHeight));
+            }
         }
         private void Layer_Background_Draw(object? sender, EventArgs_Draw e)
         {
@@ -375,7 +596,7 @@ namespace positron
         }
         private void Layer_Data_Draw(object? sender, EventArgs_Draw e)
         {
-            foreach (EComponent comp in Components)
+            foreach (EComponent comp in ComponentsList)
             {
                 comp.Render(this, e);
             }
@@ -482,18 +703,46 @@ namespace positron
             None,
             Panning,
             ResizeSidebar,
+            MovingScrollThumb,
         }
         private enum Section
         {
             None,
+            Main,
             Sidebar,
             SidebarSizer,
-            Main,
+            ScrollBar,
+            ScrollBarUp,
+            ScrollBarDown,
+            ScrollBarThumb,
+        }
+        private enum Components
+        {
+            None,
+            Wire,
+            Test,
+            Test2,
+            Test3,
+            Test4,
+            Test5,
+            Test6,
+            Test7,
+            Test8,
+            Test9,
+            Test10,
+            Test11,
+            Test12,
+            Test13,
+            Test14,
+            Test15,
+            Test16,
+            Test17,
         }
         private struct Position
         {
             public Section Section;
             public Node? Node;
+            public Components Component;
         }
     }
 }
