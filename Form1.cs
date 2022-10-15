@@ -461,8 +461,6 @@ namespace positron
             {
                 switch (mouseState)
                 {
-                    case MouseState.None:
-                        break;
                     case MouseState.Panning:{
                         offset.X += e.Location.X - m_PrevMouseLoc.X;
                         offset.Y += e.Location.Y - m_PrevMouseLoc.Y;
@@ -481,6 +479,10 @@ namespace positron
                         }
                         layer_NCDisplay.Invalidate();
                     }break;
+                    case MouseState.MovingScrollThumb:{
+                        moveThumb(e.Location.Y - m_PrevMouseLoc.Y);
+                    }break;
+                    case MouseState.None:
                     default:
                         break;
                 }
@@ -526,6 +528,29 @@ namespace positron
             }
             Cursor = nCursor;
         }
+        private void moveThumb(int amount)
+        {
+            if (scrollbarHeight == SkiaSurface.Height - (scrollBarWidth * 2))
+            {
+                return;
+            }
+            //this is a rearanged version of the calculation for the scrollbarOffset in CalculateScrollbar
+            scrollbarOffset = scrollbarOffset + amount;
+            if (scrollbarOffset > SkiaSurface.Height - (scrollBarWidth * 2) - scrollbarHeight)
+            {
+                scrollbarOffset = SkiaSurface.Height - (scrollBarWidth * 2) - scrollbarHeight;
+            }
+            if (scrollbarOffset < 0)
+            {
+                scrollbarOffset = 0;
+            }
+            scrollOffset = (int)(
+                scrollbarOffset *
+                (((Enum.GetNames(typeof(Components)).Length - 1) * textHeight) - SkiaSurface.Height) /
+                (float)(SkiaSurface.Height - (scrollBarWidth * 2) - scrollbarHeight)
+            );
+            layer_NCDisplay.Invalidate();
+        }
         private void CalculateScrollbar()
         {
             int contentHeight = (Enum.GetNames(typeof(Components)).Length - 1) * textHeight;
@@ -536,11 +561,13 @@ namespace positron
             }
             else
             {
+                //esentialy just a lerp
                 scrollbarHeight = (int)((SkiaSurface.Height / (float)contentHeight) * (SkiaSurface.Height - (scrollBarWidth * 2)));
                 scrollbarHeight = Math.Max(
                     Math.Min(20, SkiaSurface.Height - (scrollBarWidth * 2)),
                     scrollbarHeight
                 );
+                //esentialy just a lerp again
                 scrollbarOffset = (int)(scrollOffset / (float)(contentHeight - SkiaSurface.Height) * (SkiaSurface.Height - (scrollBarWidth * 2) - scrollbarHeight));
             }
         }
