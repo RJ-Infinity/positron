@@ -170,6 +170,31 @@ namespace positron
                             mouseState = MouseState.DraggingNode;
                         }
                     }
+                    else if(e.Button == MouseButtons.Right)
+                    {
+                        if (nodeHovering != null)
+                        {
+                            bool found = false;
+                            foreach (EComponent c in ComponentsList.ToArray())
+                            {
+                                foreach (Node node in c.IONodes.ToArray())
+                                {
+                                    if (node == nodeHovering)
+                                    {
+                                        ComponentsList.Remove(c);
+                                        layer_Data.Invalidate();
+                                        found = true;
+                                        nodeHovering = null;
+                                        break;
+                                    }
+                                }
+                                if (found)
+                                {
+                                    break;
+                                }
+                            }
+                        }
+                    }
                     break;
                 default:
                     break;
@@ -431,6 +456,11 @@ namespace positron
                 layer_Data.Invalidate();
                 layer_Overlay.Invalidate();
             }
+            if (e.KeyCode == Keys.F4)
+            {
+                ComponentsList.Clear();
+                layer_Data.Invalidate();
+            }
             UpdateDrawing();
         }
         private void UpdateScroll()
@@ -474,6 +504,27 @@ namespace positron
                 case Section.None:
                 case Section.SidebarSizer:
                 case Section.Main:
+                    bool NotNull = nodeHovering == null;
+                    nodeHovering = null;
+                    foreach (EComponent c in ComponentsList)
+                        foreach (Node node in c.IONodes)
+                        {
+                            if (
+                                WorldToScreen(node.Position).X < mousePos.X + 5 &&
+                                WorldToScreen(node.Position).X > mousePos.X - 5 &&
+                                WorldToScreen(node.Position).Y < mousePos.Y + 5 &&
+                                WorldToScreen(node.Position).Y > mousePos.Y - 5
+                            )
+                            {
+                                nodeHovering = node;
+                                layer_Data.Invalidate();
+                            }
+                        }
+                    if (NotNull)
+                    {
+                        layer_Data.Invalidate();
+                    }
+                    break;
                 default:
                     break;
             }
@@ -649,8 +700,16 @@ namespace positron
             {
                 comp.Render(this, e);
             }
+            using SKPaint paint = new();
+            if (nodeHovering != null)
+            {
+                Node NH = nodeHovering;
+                paint.Color = SKColors.Red;
+                paint.Style = SKPaintStyle.Stroke;
+                paint.StrokeWidth = 1;
+                e.Canvas.DrawCircle(WorldToScreen(NH.Position), 5, paint);
+            }
         }
-
         private void Layer_Overlay_Draw(object? sender, EventArgs_Draw e)
         {
             // Draw the mouse coordinate text next to the cursor
