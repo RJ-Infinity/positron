@@ -24,7 +24,20 @@ namespace positron
         private Layer layer_NCDisplay;
         
         private SKPoint mousePos = new();
-        private MouseState mouseState = MouseState.None;
+        private MouseState _mouseState = MouseState.None;
+        private MouseState mouseState
+        {
+            get
+            {
+                return _mouseState;
+            }
+            set
+            {
+                _mouseState = value;
+                layer_Overlay.Invalidate();
+                UpdateDrawing();
+            }
+        }
         private Point m_PrevMouseLoc = new();
         
         private bool ShowGrid = true;
