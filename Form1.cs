@@ -269,54 +269,22 @@ namespace positron
         private void Layer_NCDisplay_Draw(object? sender, EventArgs_Draw e)
         {
             using SKPaint paint = new();
-            //resiser
-            e.Canvas.DrawLine(new(sideBarWidth + 1, 0), new(sideBarWidth + 1, e.Bounds.Height), paint);
             //background
             paint.Color = SKColors.White;
             e.Canvas.DrawRect(new(0, 0, sideBarWidth - scrollBarWidth, e.Bounds.Height), paint);
-            //scrollbar
-            paint.Color = SKColors.LightGray;
-            //scrollbar bg
-            e.Canvas.DrawRect(new(
-                sideBarWidth - scrollBarWidth,
-                0,
-                sideBarWidth,
-                e.Bounds.Height
-            ), paint);
-            //scrollbar arrow up
-            paint.Color = SKColors.Black;
-            e.Canvas.DrawLine(
-                new(sideBarWidth - scrollBarWidth + 1, scrollBarWidth - 1),
-                new(sideBarWidth - scrollBarWidth + (float)(scrollBarWidth / 2), 1),
-                paint
-            );
-            e.Canvas.DrawLine(
-                new(sideBarWidth - scrollBarWidth + (float)(scrollBarWidth / 2), 1),
-                new(sideBarWidth - 1, scrollBarWidth - 1),
-                paint
-            );
-            //scrollbar arrow down
-            paint.Color = SKColors.Black;
-            e.Canvas.DrawLine(
-                new(sideBarWidth - scrollBarWidth + 1, e.Bounds.Height - scrollBarWidth + 1),
-                new(sideBarWidth - scrollBarWidth + (float)(scrollBarWidth / 2), e.Bounds.Height - 1),
-                paint
-            );
-            e.Canvas.DrawLine(
-                new(sideBarWidth - scrollBarWidth + (float)(scrollBarWidth / 2), e.Bounds.Height + 1),
-                new(sideBarWidth - 1, e.Bounds.Height - scrollBarWidth + 1),
-                paint
-            );
-            //thumb
-            e.Canvas.DrawRect(new(
-                sideBarWidth - scrollBarWidth,
-                scrollBarWidth + scrollbarOffset,
-                sideBarWidth,
-                scrollBarWidth + scrollbarOffset + scrollbarHeight
-            ), paint);
             //Components
             paint.TextSize = textHeight - (textPadding * 2);
             paint.Color = SKColors.DarkGray;
+
+            //clear the bit of the display without overflow
+            SKPath path = new SKPath();
+            path.AddRect(new(
+                0,
+                0,
+                sideBarWidth + 1,
+                SkiaSurface.Height
+            ));
+            e.Canvas.ClipPath(path);
 
             int i = 1;
             foreach (Components component in Enum.GetValues(typeof(Components)))
@@ -353,8 +321,55 @@ namespace positron
                 e.Canvas.DrawText(component.ToString(), textPadding, (i * textHeight) - textPadding - scrollOffset, paint);
                 i++;
             }
+            //scrollbar
+            paint.Color = SKColors.LightGray;
+            //scrollbar bg
+            e.Canvas.DrawRect(new(
+                sideBarWidth - scrollBarWidth,
+                0,
+                sideBarWidth,
+                e.Bounds.Height
+            ), paint);
+            //scrollbar arrow up
+            paint.Color = SKColors.Black;
+            e.Canvas.DrawLine(
+                new(sideBarWidth - scrollBarWidth + 1, scrollBarWidth - 1),
+                new(sideBarWidth - scrollBarWidth + (float)(scrollBarWidth / 2), 1),
+                paint
+            );
+            e.Canvas.DrawLine(
+                new(sideBarWidth - scrollBarWidth + (float)(scrollBarWidth / 2), 1),
+                new(sideBarWidth - 1, scrollBarWidth - 1),
+                paint
+            );
+            //scrollbar arrow down
+            e.Canvas.DrawLine(
+                new(sideBarWidth - scrollBarWidth + 1, e.Bounds.Height - scrollBarWidth + 1),
+                new(sideBarWidth - scrollBarWidth + (float)(scrollBarWidth / 2), e.Bounds.Height - 1),
+                paint
+            );
+            e.Canvas.DrawLine(
+                new(sideBarWidth - scrollBarWidth + (float)(scrollBarWidth / 2), e.Bounds.Height + 1),
+                new(sideBarWidth - 1, e.Bounds.Height - scrollBarWidth + 1),
+                paint
+            );
+            //thumb
+            paint.Color = SKColors.Gray;
+            if (SkiaSurface.Height >= (Enum.GetValues(typeof(Components)).Length-1)*textHeight)
+            {
+                paint.Color = SKColors.LightGray;
+            }
+            //paint.Color = SKColors.Gray;
+            e.Canvas.DrawRect(new(
+                sideBarWidth - scrollBarWidth,
+                scrollBarWidth + scrollbarOffset,
+                sideBarWidth,
+                scrollBarWidth + scrollbarOffset + scrollbarHeight
+            ), paint);
+            //resiser
+            paint.Color = SKColors.Black;
+            e.Canvas.DrawLine(new(sideBarWidth + 1, 0), new(sideBarWidth + 1, e.Bounds.Height), paint);
         }
-
         private void SkiaSurface_MouseWheel(object? sender, MouseEventArgs e)
         {
             Position pos = MousePos(e.Location.ToSKPoint());
@@ -764,6 +779,7 @@ namespace positron
             Test15,
             Test16,
             Test17,
+            TESTLONGNAMETESTINGASDFGHJKL,
         }
         private struct Position
         {
