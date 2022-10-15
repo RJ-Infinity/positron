@@ -11,7 +11,11 @@ namespace positron
     class ECWire : EComponent
     {
         public override int IOs => 2;
-
+        public ECWire(SKPoint position):base(position)
+        {
+            IONodes[0] = new Node(position);
+            IONodes[1] = new Node(position + new SKPoint(10,10));
+        }
         public override void Render(object sender, EventArgs_Draw e)
         {
             using (SKPaint paint = new()

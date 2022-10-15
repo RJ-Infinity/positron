@@ -48,6 +48,8 @@ namespace positron
         private Components hoverComponent = Components.None;
         private Components selectComponent = Components.None;
 
+        private Node? nodeHovering = null;
+
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
         public Form1()
 #pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
@@ -93,11 +95,6 @@ namespace positron
 
             // Set the title of the Form
             this.Text = "Positron";
-
-
-            ComponentsList.Add(new ECWire());
-            ComponentsList[0].IONodes[0] = new(new SKPoint(50, 50));
-            ComponentsList[0].IONodes[1] = new(new SKPoint(150, 150));
         }
 
         private void SkiaSurface_Resize(object? sender, EventArgs e)
@@ -113,7 +110,6 @@ namespace positron
             UpdateScroll();
             layer_NCDisplay.Invalidate();
         }
-
         public override void UpdateDrawing()
         {
             SetCursor();
@@ -122,7 +118,6 @@ namespace positron
         private void SkiaSurface_MouseDown(object? sender, MouseEventArgs e)
         {
             Position mousePos = MousePos(e.Location.ToSKPoint());
-            Console.WriteLine(mousePos.Section);
             switch (mousePos.Section)
             {
                 case Section.None:
@@ -162,6 +157,18 @@ namespace positron
                     )
                     {
                         mouseState = MouseState.Panning;
+                    }
+                    else if(e.Button == MouseButtons.Left)
+                    {
+                        if (nodeHovering == null)
+                        {
+                            ComponentsList.Add(new ECWire(ScreenToWorld(e.Location.ToSKPoint())));
+                            layer_Data.Invalidate();
+                        }
+                        else
+                        {
+                            mouseState = MouseState.DraggingNode;
+                        }
                     }
                     break;
                 default:
@@ -653,9 +660,10 @@ namespace positron
             {
                 int padding = 2;
                 string str =
-                    "ScreenPos:"+mousePos.ToString() + "\n" +
-                    "WorldPos:"+ScreenToWorld(mousePos).ToString() + "\n" +
-                    "Zoom:"+(int)(zoom*100)+"%";
+                    "ScreenPos:" + mousePos.ToString() + "\n" +
+                    "WorldPos:" + ScreenToWorld(mousePos).ToString() + "\n" +
+                    "Zoom:" + (int)(zoom * 100) + "%\n" +
+                    "State" + mouseState.ToString();
                 List<SKRect> lineboundsList = new();
 
                 float height = 0;
@@ -746,6 +754,7 @@ namespace positron
             Panning,
             ResizeSidebar,
             MovingScrollThumb,
+            DraggingNode,
         }
         private enum Section
         {

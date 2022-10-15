@@ -13,7 +13,7 @@ namespace positron
         public abstract int IOs { get; }
         public Node[] IONodes;
         public abstract void Render(object sender, EventArgs_Draw e);
-        public EComponent()
+        public EComponent(SKPoint position)
         {
             IONodes = new Node[IOs];
         }

@@ -97,7 +97,14 @@ namespace PGL
             if (m_Picture != null)
             {
                 // Play back the previously recorded Draw commands to the skglControlCanvas using the GUI thread
-                skglControlCanvas.DrawPicture(m_Picture);
+                try
+                {
+                    skglControlCanvas.DrawPicture(m_Picture);
+                }
+                catch (AccessViolationException)
+                {
+                    Console.WriteLine("AccessViolationException");
+                }
 
                 this.PaintCount++;
             }
