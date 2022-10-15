@@ -461,6 +461,23 @@ namespace positron
                 ComponentsList.Clear();
                 layer_Data.Invalidate();
             }
+            if((e.KeyCode == Keys.OemMinus || e.KeyCode == Keys.Oemplus) && e.Modifiers == Keys.Alt)
+            {
+                SKPoint InitialWorldPos = ScreenToWorld(mousePos);
+                zoom *= e.KeyCode == Keys.OemMinus?0.9f:1.1f;
+                if (zoom > 15)
+                {
+                    zoom = 15;
+                }
+                if (zoom < 0.15)
+                {
+                    zoom = 0.15F;
+                }
+                offset += mousePos - WorldToScreen(InitialWorldPos);
+                layer_Data.Invalidate();
+                layer_Grid.Invalidate();
+                layer_Overlay.Invalidate();
+            }
             UpdateDrawing();
         }
         private void UpdateScroll()
