@@ -534,25 +534,30 @@ namespace positron
                 case Section.None:
                 case Section.SidebarSizer:
                 case Section.Main:
-                    bool NotNull = nodeHovering == null;
-                    nodeHovering = null;
-                    foreach (EComponent c in ComponentsList)
-                        foreach (Node node in c.IONodes)
+                    if (mouseState != MouseState.DraggingNode)
+                    {
+                        bool NotNull = nodeHovering == null;
+                        nodeHovering = null;
+                        foreach (EComponent c in ComponentsList)
                         {
-                            if (
-                                WorldToScreen(node.Position).X < mousePos.X + 5 &&
-                                WorldToScreen(node.Position).X > mousePos.X - 5 &&
-                                WorldToScreen(node.Position).Y < mousePos.Y + 5 &&
-                                WorldToScreen(node.Position).Y > mousePos.Y - 5
-                            )
+                            foreach (Node node in c.IONodes)
                             {
-                                nodeHovering = node;
-                                layer_Data.Invalidate();
+                                if (
+                                    WorldToScreen(node.Position).X < mousePos.X + 5 &&
+                                    WorldToScreen(node.Position).X > mousePos.X - 5 &&
+                                    WorldToScreen(node.Position).Y < mousePos.Y + 5 &&
+                                    WorldToScreen(node.Position).Y > mousePos.Y - 5
+                                )
+                                {
+                                    nodeHovering = node;
+                                    layer_Data.Invalidate();
+                                }
                             }
                         }
-                    if (NotNull)
-                    {
-                        layer_Data.Invalidate();
+                        if (NotNull)
+                        {
+                            layer_Data.Invalidate();
+                        }
                     }
                     break;
                 default:
@@ -584,6 +589,12 @@ namespace positron
                     }break;
                     case MouseState.MovingScrollThumb:{
                         moveThumb(e.Location.Y - m_PrevMouseLoc.Y);
+                    }break;
+                    case MouseState.DraggingNode: {
+                        if (nodeHovering == null)
+                        {break;}
+                        nodeHovering.Position = ScreenToWorld(e.Location.ToSKPoint());
+                        layer_Data.Invalidate();
                     }break;
                     case MouseState.None:
                     default:
@@ -624,6 +635,12 @@ namespace positron
                     break;
                 case MouseState.ResizeSidebar:
                     nCursor = Cursors.VSplit;
+                    break;
+                case MouseState.MovingScrollThumb:
+                    nCursor = Cursors.Arrow;
+                    break;
+                case MouseState.DraggingNode:
+                    nCursor = Cursors.SizeAll;
                     break;
                 case MouseState.None:
                 default:
