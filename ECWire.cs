@@ -19,8 +19,8 @@ namespace positron
         );
         public ECWire(SKPoint position):base(position)
         {
-            IONodes[0] = new Node(position);
-            IONodes[1] = new Node(position + new SKPoint(10,10));
+            IONodes[0] = new Node(position,SKColors.Red);
+            IONodes[1] = new Node(position + new SKPoint(10,10), SKColors.Red);
         }
         public override void Render(object sender, EventArgs_Draw e)
         {

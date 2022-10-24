@@ -61,7 +61,7 @@ namespace positron
         private Components hoverComponent = Components.None;
         private Components selectComponent = Components.None;
 
-        private Node? nodeHovering = null;
+        private Node? lastNode = null;
 
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
         public Form1()
@@ -176,6 +176,7 @@ namespace positron
                         if (mousePos.Node == null)
                         {
                             ComponentsList.Add(new ECWire(ScreenToWorld(e.Location.ToSKPoint())));
+                            nodes.AddRange(ComponentsList[ComponentsList.Count - 1].IONodes);
                             layer_Data.Invalidate();
                         }
                         else
@@ -216,12 +217,13 @@ namespace positron
         }
         private Position MousePos(SKPoint mouse)
         {
+            Node? node = mouseState == MouseState.DraggingNode ? lastNode : null;
             if (mouse.X > sideBarWidth - 1 && mouse.X < sideBarWidth + 2)
             {
                 return new Position
                 {
                     Section = Section.SidebarSizer,
-                    Node = null,
+                    Node = node,
                     Component = Components.None,
                 };
             }
@@ -234,7 +236,7 @@ namespace positron
                         return new Position
                         {
                             Section = Section.ScrollBarUp,
-                            Node = null,
+                            Node = node,
                             Component = Components.None,
                         };
                     }
@@ -243,7 +245,7 @@ namespace positron
                         return new Position
                         {
                             Section = Section.ScrollBarDown,
-                            Node = null,
+                            Node = node,
                             Component = Components.None,
                         };
                     }
@@ -255,14 +257,14 @@ namespace positron
                         return new Position
                         {
                             Section = Section.ScrollBarThumb,
-                            Node = null,
+                            Node = node,
                             Component = Components.None,
                         };
                     }
                         return new Position
                     {
                         Section = Section.ScrollBar,
-                        Node = null,
+                        Node = node,
                         Component = Components.None,
                     };
                 }
@@ -270,7 +272,7 @@ namespace positron
                 return new Position
                 {
                     Section = Section.Sidebar,
-                    Node = null,
+                    Node = node,
                     Component = Enum.IsDefined(typeof(Components), c)?c:Components.None,
                 };
             }
@@ -281,10 +283,10 @@ namespace positron
                     SKPoint pos = WorldToScreen(n.Position);
                     if (
                         new SKRect(
-                            pos.X - 2,
-                            pos.Y - 2,
-                            pos.X + 2,
-                            pos.Y + 2
+                            pos.X - 5,
+                            pos.Y - 5,
+                            pos.X + 5,
+                            pos.Y + 5
                         )
                         .Contains(mouse)
                     )
@@ -292,7 +294,7 @@ namespace positron
                         return new Position
                         {
                             Section = Section.Main,
-                            Node = n,
+                            Node = mouseState == MouseState.DraggingNode ? node : n,
                             Component = Components.None,
                         };
                     }
@@ -300,14 +302,14 @@ namespace positron
                 return new Position
                 {
                     Section = Section.Main,
-                    Node = null,
+                    Node = node,
                     Component = Components.None,
                 };
             }
             return new Position
             {
                 Section = Section.None,
-                Node = null,
+                Node = node,
                 Component = Components.None,
             };
         }
@@ -516,6 +518,11 @@ namespace positron
                 mouseState = MouseState.None;
             }
             Position mousePos = MousePos(MouseLocation);
+            if (lastNode != mousePos.Node)
+            {
+                layer_Data.Invalidate();
+            }
+            lastNode = mousePos.Node;
             if (mousePos.Section != Section.Sidebar && hoverComponent != Components.None)
             {
                 hoverComponent = Components.None;
@@ -725,7 +732,7 @@ namespace positron
             Position mousePos = MousePos(MouseLocation);
             if (mousePos.Node != null)
             {
-                paint.Color = SKColors.Red;
+                paint.Color = mousePos.Node.Colour;
                 paint.Style = SKPaintStyle.Stroke;
                 paint.StrokeWidth = 1;
                 e.Canvas.DrawCircle(WorldToScreen(mousePos.Node.Position), 5, paint);
