@@ -12,6 +12,7 @@ namespace positron
     {
         public abstract int IOs { get; }
         public Node[] IONodes;
+        public abstract SKRect BoundingBox { get; }
         public abstract void Render(object sender, EventArgs_Draw e);
         public EComponent(SKPoint position)
         {

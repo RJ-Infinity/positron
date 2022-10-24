@@ -11,6 +11,12 @@ namespace positron
     class ECWire : EComponent
     {
         public override int IOs => 2;
+        public override SKRect BoundingBox => new SKRect(
+            Math.Min(IONodes[0].Position.X, IONodes[1].Position.X),
+            Math.Min(IONodes[0].Position.Y, IONodes[1].Position.Y),
+            Math.Max(IONodes[0].Position.X, IONodes[1].Position.X),
+            Math.Max(IONodes[0].Position.Y, IONodes[1].Position.Y)
+        );
         public ECWire(SKPoint position):base(position)
         {
             IONodes[0] = new Node(position);
