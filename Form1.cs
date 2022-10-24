@@ -23,7 +23,7 @@ namespace positron
         private Layer layer_Overlay;
         private Layer layer_NCDisplay;
         
-        private SKPoint mousePos = new();
+        private SKPoint MouseLocation = new();
         private MouseState _mouseState = MouseState.None;
         private MouseState mouseState
         {
@@ -173,7 +173,7 @@ namespace positron
                     }
                     else if(e.Button == MouseButtons.Left)
                     {
-                        if (nodeHovering == null)
+                        if (mousePos.Node == null)
                         {
                             ComponentsList.Add(new ECWire(ScreenToWorld(e.Location.ToSKPoint())));
                             layer_Data.Invalidate();
@@ -185,19 +185,19 @@ namespace positron
                     }
                     else if(e.Button == MouseButtons.Right)
                     {
-                        if (nodeHovering != null)
+                        if (mousePos.Node != null)
                         {
                             bool found = false;
                             foreach (EComponent c in ComponentsList.ToArray())
                             {
                                 foreach (Node node in c.IONodes.ToArray())
                                 {
-                                    if (node == nodeHovering)
+                                    if (node == mousePos.Node)
                                     {
                                         ComponentsList.Remove(c);
                                         layer_Data.Invalidate();
                                         found = true;
-                                        nodeHovering = null;
+                                        mousePos.Node = null;
                                         break;
                                     }
                                 }
@@ -476,7 +476,7 @@ namespace positron
             }
             if((e.KeyCode == Keys.OemMinus || e.KeyCode == Keys.Oemplus) && e.Modifiers == Keys.Alt)
             {
-                SKPoint InitialWorldPos = ScreenToWorld(mousePos);
+                SKPoint InitialWorldPos = ScreenToWorld(MouseLocation);
                 zoom *= e.KeyCode == Keys.OemMinus?0.9f:1.1f;
                 if (zoom > 15)
                 {
@@ -486,7 +486,7 @@ namespace positron
                 {
                     zoom = 0.15F;
                 }
-                offset += mousePos - WorldToScreen(InitialWorldPos);
+                offset += MouseLocation - WorldToScreen(InitialWorldPos);
                 layer_Data.Invalidate();
                 layer_Grid.Invalidate();
                 layer_Overlay.Invalidate();
@@ -509,57 +509,31 @@ namespace positron
         private void SkglControl1_MouseMove(object? sender, MouseEventArgs e)
         {
             // Save the mouse position
-            mousePos = e.Location.ToSKPoint();
+            MouseLocation = e.Location.ToSKPoint();
             SetCursor();
             if (e.Button == MouseButtons.None)
             {
                 mouseState = MouseState.None;
             }
-            Position mp = MousePos(mousePos);
-            if (mp.Section != Section.Sidebar && hoverComponent != Components.None)
+            Position mousePos = MousePos(MouseLocation);
+            if (mousePos.Section != Section.Sidebar && hoverComponent != Components.None)
             {
                 hoverComponent = Components.None;
                 layer_NCDisplay.Invalidate();
             }
 
-            switch (mp.Section)
+            switch (mousePos.Section)
             {
                 case Section.Sidebar:
-                    if (hoverComponent != mp.Component)
+                    if (hoverComponent != mousePos.Component)
                     {
-                        hoverComponent = mp.Component;
+                        hoverComponent = mousePos.Component;
                         layer_NCDisplay.Invalidate();
                     }
                     break;
                 case Section.None:
                 case Section.SidebarSizer:
                 case Section.Main:
-                    if (mouseState != MouseState.DraggingNode)
-                    {
-                        bool NotNull = nodeHovering == null;
-                        nodeHovering = null;
-                        foreach (EComponent c in ComponentsList)
-                        {
-                            foreach (Node node in c.IONodes)
-                            {
-                                if (
-                                    WorldToScreen(node.Position).X < mousePos.X + 5 &&
-                                    WorldToScreen(node.Position).X > mousePos.X - 5 &&
-                                    WorldToScreen(node.Position).Y < mousePos.Y + 5 &&
-                                    WorldToScreen(node.Position).Y > mousePos.Y - 5
-                                )
-                                {
-                                    nodeHovering = node;
-                                    layer_Data.Invalidate();
-                                }
-                            }
-                        }
-                        if (NotNull)
-                        {
-                            layer_Data.Invalidate();
-                        }
-                    }
-                    break;
                 default:
                     break;
             }
@@ -591,9 +565,9 @@ namespace positron
                         moveThumb(e.Location.Y - m_PrevMouseLoc.Y);
                     }break;
                     case MouseState.DraggingNode: {
-                        if (nodeHovering == null)
+                        if (mousePos.Node == null)
                         {break;}
-                        nodeHovering.Position = ScreenToWorld(e.Location.ToSKPoint());
+                        mousePos.Node.Position = ScreenToWorld(e.Location.ToSKPoint());
                         layer_Data.Invalidate();
                     }break;
                     case MouseState.None:
@@ -611,9 +585,9 @@ namespace positron
         }
         private void SetCursor()
         {
-            Position pos = MousePos(mousePos);
+            Position mousePos = MousePos(MouseLocation);
             Cursor nCursor = Cursor.Current;
-            switch (pos.Section)
+            switch (mousePos.Section)
             {
                 case Section.SidebarSizer:
                     nCursor = Cursors.SizeWE;
@@ -748,13 +722,13 @@ namespace positron
                 comp.Render(this, e);
             }
             using SKPaint paint = new();
-            if (nodeHovering != null)
+            Position mousePos = MousePos(MouseLocation);
+            if (mousePos.Node != null)
             {
-                Node NH = nodeHovering;
                 paint.Color = SKColors.Red;
                 paint.Style = SKPaintStyle.Stroke;
                 paint.StrokeWidth = 1;
-                e.Canvas.DrawCircle(WorldToScreen(NH.Position), 5, paint);
+                e.Canvas.DrawCircle(WorldToScreen(mousePos.Node.Position), 5, paint);
             }
         }
         private void Layer_Overlay_Draw(object? sender, EventArgs_Draw e)
@@ -766,8 +740,8 @@ namespace positron
             {
                 int padding = 2;
                 string str =
-                    "ScreenPos:" + mousePos.ToString() + "\n" +
-                    "WorldPos:" + ScreenToWorld(mousePos).ToString() + "\n" +
+                    "ScreenPos:" + MouseLocation.ToString() + "\n" +
+                    "WorldPos:" + ScreenToWorld(MouseLocation).ToString() + "\n" +
                     "Zoom:" + (int)(zoom * 100) + "%\n" +
                     "State" + mouseState.ToString();
                 List<SKRect> lineboundsList = new();
@@ -795,7 +769,7 @@ namespace positron
 
                 }
 
-                SKPoint pos = mousePos;
+                SKPoint pos = MouseLocation;
 
                 if (pos.X < sideBarWidth + 1)
                 {
